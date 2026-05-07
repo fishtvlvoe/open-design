@@ -9,7 +9,7 @@
  *   - 'stderr'  : incidental stderr. Shown only when the process exits
  *                 non-zero (tail appended to the error message).
  */
-import type { AgentEvent, ChatMessage } from '../types';
+import type { AgentEvent, ChatCommentAttachment, ChatMessage } from '../types';
 import type {
   ChatRunCreateResponse,
   ChatRunListResponse,
@@ -51,6 +51,7 @@ export interface DaemonStreamOptions {
   // daemon resolves them inside the project folder, validates they
   // exist, and stitches them into the user message as `@<path>` hints.
   attachments?: string[];
+  commentAttachments?: ChatCommentAttachment[];
   // Per-CLI model + reasoning the user picked in the model menu. Both are
   // optional; the daemon validates them against the agent's declared
   // options and falls back to the CLI default when missing.
@@ -85,6 +86,7 @@ export async function streamViaDaemon({
   skillId,
   designSystemId,
   attachments,
+  commentAttachments,
   model,
   reasoning,
   initialLastEventId,
@@ -108,6 +110,7 @@ export async function streamViaDaemon({
     skillId: skillId ?? null,
     designSystemId: designSystemId ?? null,
     attachments: attachments ?? [],
+    commentAttachments: commentAttachments ?? [],
     model: model ?? null,
     reasoning: reasoning ?? null,
   };
@@ -363,6 +366,28 @@ function translateAgentEvent(data: DaemonAgentPayload): AgentEvent | null {
   }
   if (t === 'thinking_start') {
     return { kind: 'status', label: 'thinking' };
+  }
+  if (t === 'live_artifact') {
+    return {
+      kind: 'live_artifact',
+      action: data.action,
+      projectId: data.projectId,
+      artifactId: data.artifactId,
+      title: data.title,
+      refreshStatus: data.refreshStatus,
+    };
+  }
+  if (t === 'live_artifact_refresh') {
+    return {
+      kind: 'live_artifact_refresh',
+      phase: data.phase,
+      projectId: data.projectId,
+      artifactId: data.artifactId,
+      refreshId: data.refreshId,
+      title: data.title,
+      refreshedSourceCount: data.refreshedSourceCount,
+      error: data.error,
+    };
   }
   if (t === 'tool_use' && typeof data.id === 'string' && typeof data.name === 'string') {
     return { kind: 'tool_use', id: data.id, name: data.name, input: data.input ?? null };

@@ -14,9 +14,24 @@
  *   { type: 'od:slide-state', active: number, count: number }
  * after every navigation so the host can render its own counter / dots.
  */
+import {
+  buildManualEditBridge,
+  buildManualEditBridgeStyle,
+  MANUAL_EDIT_DISCOVERY_SELECTOR,
+  MANUAL_EDIT_SOURCE_PATH_ATTR,
+} from '../edit-mode/bridge';
+
+export type SrcdocOptions = {
+  deck?: boolean;
+  baseHref?: string;
+  initialSlideIndex?: number;
+  commentBridge?: boolean;
+  editBridge?: boolean;
+};
+
 export function buildSrcdoc(
   html: string,
-  options: { deck?: boolean; baseHref?: string; initialSlideIndex?: number } = {}
+  options: SrcdocOptions = {}
 ): string {
   const head = html.trimStart().slice(0, 64).toLowerCase();
   const isFullDoc = head.startsWith("<!doctype") || head.startsWith("<html");
@@ -30,10 +45,60 @@ export function buildSrcdoc(
   </head>
   <body>${html}</body>
 </html>`;
-  const withBase = options.baseHref ? injectBaseHref(wrapped, options.baseHref) : wrapped;
+  const withSourcePaths = options.editBridge ? annotateManualEditSourcePaths(wrapped) : wrapped;
+  const withBase = options.baseHref ? injectBaseHref(withSourcePaths, options.baseHref) : withSourcePaths;
   const withShim = injectSandboxShim(withBase);
-  if (!options.deck) return withShim;
-  return injectDeckBridge(withShim, options.initialSlideIndex);
+  const withDeck = options.deck ? injectDeckBridge(withShim, options.initialSlideIndex) : withShim;
+  const withComment = options.commentBridge ? injectCommentBridge(withDeck) : withDeck;
+  return options.editBridge ? injectManualEditBridge(withComment) : withComment;
+}
+
+function annotateManualEditSourcePaths(doc: string): string {
+  if (typeof DOMParser === 'undefined') return doc;
+  try {
+    const parsed = new DOMParser().parseFromString(doc, 'text/html');
+    parsed.body.querySelectorAll(MANUAL_EDIT_DISCOVERY_SELECTOR).forEach((el) => {
+      if (el.hasAttribute('data-od-id')) return;
+      const path = sourcePathForElement(el);
+      if (path) el.setAttribute(MANUAL_EDIT_SOURCE_PATH_ATTR, path);
+    });
+    return serializeHtmlDocument(parsed);
+  } catch {
+    return doc;
+  }
+}
+
+function sourcePathForElement(el: Element): string {
+  const parts: number[] = [];
+  let node: Element | null = el;
+  while (node && node !== node.ownerDocument.body) {
+    const parent: Element | null = node.parentElement;
+    if (!parent) break;
+    parts.unshift(Array.prototype.indexOf.call(parent.children, node));
+    node = parent;
+  }
+  return parts.length ? `path-${parts.join('-')}` : '';
+}
+
+function serializeHtmlDocument(doc: Document): string {
+  const doctype = doc.doctype ? '<!doctype html>\n' : '';
+  return `${doctype}${doc.documentElement.outerHTML}`;
+}
+
+function injectManualEditBridge(doc: string): string {
+  const withStyle = injectBeforeHeadEnd(doc, buildManualEditBridgeStyle());
+  return injectBeforeBodyEnd(withStyle, buildManualEditBridge(true));
+}
+
+function injectBeforeHeadEnd(doc: string, payload: string): string {
+  if (/<\/head>/i.test(doc)) return doc.replace(/<\/head>/i, `${payload}</head>`);
+  if (/<head[^>]*>/i.test(doc)) return doc.replace(/<head[^>]*>/i, (m) => `${m}${payload}`);
+  return payload + doc;
+}
+
+function injectBeforeBodyEnd(doc: string, payload: string): string {
+  if (/<\/body>/i.test(doc)) return doc.replace(/<\/body>/i, `${payload}</body>`);
+  return doc + payload;
 }
 
 function injectBaseHref(doc: string, baseHref: string): string {
@@ -65,7 +130,7 @@ function escapeAttr(value: string): string {
 // in-memory shim BEFORE any user script runs so those decks degrade
 // gracefully (position just doesn't persist across reloads).
 function injectSandboxShim(doc: string): string {
-  const shim = `<script>(function(){
+  const shim = `<script data-od-sandbox-shim>(function(){
   function makeStore(){
     var data = {};
     var api = {
@@ -94,6 +159,229 @@ function injectSandboxShim(doc: string): string {
   if (/<body[^>]*>/i.test(doc))
     return doc.replace(/<body[^>]*>/i, (m) => `${m}${shim}`);
   return shim + doc;
+}
+
+function injectCommentBridge(doc: string): string {
+  const script = `<script data-od-comment-bridge>(function(){
+  var enabled = true;
+  var mode = 'picker';
+  var hoveredId = null;
+  var selectableCache = null;
+  var drawing = false;
+  var stroke = [];
+  var postTargetsTimer = null;
+  var MAX_TARGETS = 400;
+  function esc(value){ try { return window.CSS && CSS.escape ? CSS.escape(value) : String(value).replace(/"/g, '\\\\"'); } catch (_) { return String(value); } }
+  function isSelectableElement(el){
+    if (!el || !el.tagName) return false;
+    var tag = el.tagName.toLowerCase();
+    if (tag === 'html' || tag === 'body' || tag === 'head' || tag === 'script' || tag === 'style' || tag === 'meta' || tag === 'link' || tag === 'title') return false;
+    var rect = el.getBoundingClientRect();
+    if (!rect || rect.width < 2 || rect.height < 2) return false;
+    var style = window.getComputedStyle ? window.getComputedStyle(el) : null;
+    if (style && (style.display === 'none' || style.visibility === 'hidden' || style.pointerEvents === 'none')) return false;
+    return true;
+  }
+  function meaningfulText(el){
+    return (el.textContent || '').replace(/\\s+/g, ' ').trim().slice(0, 160);
+  }
+  function shortLabel(el){
+    var tag = el.tagName ? el.tagName.toLowerCase() : 'element';
+    var id = typeof el.id === 'string' && el.id.trim() ? '#' + el.id.trim() : '';
+    var cls = typeof el.className === 'string' && el.className.trim() ? '.' + el.className.trim().split(/\\s+/).slice(0,2).join('.') : '';
+    return tag + id + cls;
+  }
+  function cssPath(el){
+    if (el.hasAttribute && el.hasAttribute('data-od-id')) {
+      return '[data-od-id="' + esc(el.getAttribute('data-od-id')) + '"]';
+    }
+    if (el.id) return '#' + esc(el.id);
+    var parts = [];
+    var node = el;
+    while (node && node.nodeType === 1 && node !== document.body && parts.length < 6) {
+      var part = node.tagName.toLowerCase();
+      var cls = typeof node.className === 'string' && node.className.trim()
+        ? node.className
+            .trim()
+            .split(/\\s+/)
+            .slice(0, 2)
+            .map(function(token){ return esc(token); })
+            .join('.')
+        : '';
+      if (cls) part += '.' + cls;
+      var index = 1;
+      var sib = node;
+      while ((sib = sib.previousElementSibling)) {
+        if (sib.tagName === node.tagName) index++;
+      }
+      part += ':nth-of-type(' + index + ')';
+      parts.unshift(part);
+      node = node.parentElement;
+      if (node && node.id) {
+        parts.unshift('#' + esc(node.id));
+        break;
+      }
+    }
+    return parts.join(' > ') || shortLabel(el);
+  }
+  function stableElementId(el){
+    if (el.hasAttribute && el.hasAttribute('data-od-id')) {
+      return el.getAttribute('data-od-id');
+    }
+    if (el.id) return el.id;
+    return cssPath(el);
+  }
+  function targetFrom(el){
+    if (!isSelectableElement(el)) return null;
+    var id = stableElementId(el);
+    var rect = el.getBoundingClientRect();
+    var html = '';
+    try { html = (el.outerHTML || '').replace(/\\s+/g, ' ').match(/^<[^>]+>/)?.[0] || ''; } catch (_) {}
+    return {
+      type: 'od:comment-target',
+      elementId: id,
+      selector: cssPath(el),
+      label: shortLabel(el),
+      text: meaningfulText(el),
+      position: { x: Math.round(rect.x), y: Math.round(rect.y), width: Math.round(rect.width), height: Math.round(rect.height) },
+      htmlHint: html.slice(0, 180)
+    };
+  }
+  function relativePoint(ev){
+    return { x: Math.round(ev.clientX), y: Math.round(ev.clientY) };
+  }
+  function postStroke(type){
+    window.parent.postMessage({ type: type, points: stroke.slice() }, '*');
+  }
+  function allTargets(){
+    if (selectableCache) return selectableCache;
+    var nodes = document.body ? document.body.querySelectorAll('*') : [];
+    var items = [];
+    for (var i = 0; i < nodes.length; i++) {
+      var item = targetFrom(nodes[i]);
+      if (item) items.push(item);
+      if (items.length >= MAX_TARGETS) break;
+    }
+    selectableCache = items;
+    return selectableCache;
+  }
+  var postTargetsPending = false;
+  function postTargets(){
+    if (!enabled) return;
+    selectableCache = null;
+    window.parent.postMessage({ type: 'od:comment-targets', targets: allTargets() }, '*');
+  }
+  function schedulePostTargets(){
+    if (!enabled || postTargetsPending) return;
+    postTargetsPending = true;
+    if (postTargetsTimer) window.clearTimeout(postTargetsTimer);
+    postTargetsTimer = window.setTimeout(function(){
+      window.requestAnimationFrame(function(){
+        postTargetsPending = false;
+        postTargetsTimer = null;
+        postTargets();
+      });
+    }, 120);
+  }
+  function closestTarget(event){
+    var el = event.target && event.target.nodeType === 3 ? event.target.parentElement : event.target;
+    while (el && el !== document.documentElement) {
+      if (isSelectableElement(el)) return el;
+      el = el.parentElement;
+    }
+    return null;
+  }
+  window.addEventListener('message', function(ev){
+    if (!ev.data || ev.data.type !== 'od:comment-mode') return;
+    enabled = !!ev.data.enabled;
+    mode = ev.data.mode === 'pod' ? 'pod' : 'picker';
+    document.documentElement.toggleAttribute('data-od-comment-mode', enabled);
+    document.documentElement.setAttribute('data-od-comment-mode-kind', mode);
+    if (enabled) setTimeout(postTargets, 0);
+    else hoveredId = null;
+    if (!enabled || mode !== 'pod') {
+      drawing = false;
+      stroke = [];
+      window.parent.postMessage({ type: 'od:pod-clear' }, '*');
+    }
+  });
+  document.addEventListener('mouseover', function(ev){
+    if (!enabled || mode !== 'picker') return;
+    var el = closestTarget(ev);
+    if (!el) return;
+    var payload = targetFrom(el);
+    if (!payload || payload.elementId === hoveredId) return;
+    hoveredId = payload.elementId;
+    window.parent.postMessage(Object.assign({}, payload, { type: 'od:comment-hover' }), '*');
+  }, true);
+  document.addEventListener('mouseout', function(ev){
+    if (!enabled || mode !== 'picker') return;
+    var el = closestTarget(ev);
+    if (!el) return;
+    var next = ev.relatedTarget;
+    while (next && next !== document.documentElement) {
+      if (next === el) return;
+      next = next.parentElement;
+    }
+    hoveredId = null;
+    window.parent.postMessage({ type: 'od:comment-leave' }, '*');
+  }, true);
+  document.addEventListener('click', function(ev){
+    if (!enabled || mode !== 'picker') return;
+    var el = closestTarget(ev);
+    if (!el) return;
+    ev.preventDefault();
+    ev.stopPropagation();
+    var payload = targetFrom(el);
+    if (payload) window.parent.postMessage(payload, '*');
+  }, true);
+  document.addEventListener('pointerdown', function(ev){
+    if (!enabled || mode !== 'pod' || ev.button !== 0) return;
+    drawing = true;
+    stroke = [relativePoint(ev)];
+    ev.preventDefault();
+    ev.stopPropagation();
+    postStroke('od:pod-stroke');
+  }, true);
+  document.addEventListener('pointermove', function(ev){
+    if (!drawing || mode !== 'pod') return;
+    var point = relativePoint(ev);
+    var last = stroke[stroke.length - 1];
+    if (last && Math.hypot(last.x - point.x, last.y - point.y) < 4) return;
+    stroke.push(point);
+    ev.preventDefault();
+    ev.stopPropagation();
+    postStroke('od:pod-stroke');
+  }, true);
+  function finishStroke(ev){
+    if (!drawing || mode !== 'pod') return;
+    drawing = false;
+    if (ev) {
+      ev.preventDefault();
+      ev.stopPropagation();
+    }
+    postStroke('od:pod-select');
+  }
+  document.addEventListener('pointerup', finishStroke, true);
+  document.addEventListener('pointercancel', finishStroke, true);
+  window.addEventListener('resize', schedulePostTargets);
+  document.addEventListener('scroll', schedulePostTargets, true);
+  var mo = new MutationObserver(schedulePostTargets);
+  mo.observe(document.documentElement, { subtree: true, childList: true, attributes: true, characterData: true });
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', postTargets);
+  else setTimeout(postTargets, 0);
+})();</script>`;
+  const style = `<style data-od-comment-bridge-style>
+html[data-od-comment-mode] body * { cursor: crosshair !important; }
+html[data-od-comment-mode][data-od-comment-mode-kind="pod"] body * { cursor: cell !important; }
+</style>`;
+  const withStyle = /<\/head>/i.test(doc)
+    ? doc.replace(/<\/head>/i, style + '</head>')
+    : /<head[^>]*>/i.test(doc)
+      ? doc.replace(/<head[^>]*>/i, (m) => m + style)
+      : style + doc;
+  if (/<\/body>/i.test(withStyle)) return withStyle.replace(/<\/body>/i, script + '</body>');
+  return withStyle + script;
 }
 
 // The deck bridge supports three deck conventions found across our skills
@@ -132,7 +420,7 @@ function injectDeckBridge(doc: string, initialSlideIndex = 0): string {
     ? doc.replace(/<head[^>]*>/i, (m) => m + styleFix)
     : styleFix + doc;
   doc = docWithStyle;
-  const script = `<script>(function(){
+  const script = `<script data-od-deck-bridge>(function(){
   var initialSlideIndex = ${safeInitialSlideIndex};
   var didRestoreInitialSlide = initialSlideIndex <= 0;
   function slides(){ return document.querySelectorAll('.slide'); }

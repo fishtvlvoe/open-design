@@ -1,8 +1,8 @@
 // Supported UI locales. Adding a new locale requires creating a new
 // dictionary in `./locales/` and registering it in `./index.tsx`.
-export type Locale = 'en' | 'de' | 'zh-CN' | 'zh-TW' | 'pt-BR' | 'es-ES' | 'ru' | 'fa' | 'ja' | 'ko';
+export type Locale = 'en' | 'de' | 'zh-CN' | 'zh-TW' | 'pt-BR' | 'es-ES' | 'ru' | 'fa' | 'ar' | 'ja' | 'ko' | 'pl' | 'hu' | 'fr' | 'uk' | 'tr';
 
-export const LOCALES: Locale[] = ['en', 'de', 'zh-CN', 'zh-TW', 'pt-BR', 'es-ES', 'ru', 'fa', 'ja', 'ko'];
+export const LOCALES: Locale[] = ['en', 'de', 'zh-CN', 'zh-TW', 'pt-BR', 'es-ES', 'ru', 'fa', 'ar', 'ja', 'ko', 'pl', 'hu', 'fr', 'uk', 'tr'];
 
 export const LOCALE_LABEL: Record<Locale, string> = {
   'en': 'English',
@@ -13,8 +13,14 @@ export const LOCALE_LABEL: Record<Locale, string> = {
   'es-ES': 'Español (España)',
   'ru': 'Русский',
   'fa': 'فارسی',
+  'ar': 'العربية',
   'ja': '日本語',
   'ko': '한국어',
+  'pl': 'Polski',
+  'hu': 'Magyar',
+  'fr': 'Français',
+  'uk': 'Українська',
+  'tr': 'Türkçe'
 };
 
 // Translation dictionary shape — flat keys, dot-namespaced. We keep it
@@ -72,6 +78,7 @@ export interface Dict {
   'settings.title': string;
   'settings.subtitle': string;
   'settings.modeAria': string;
+  'settings.protocolAria': string;
   'settings.modeDaemon': string;
   'settings.modeDaemonHelp': string;
   'settings.modeDaemonOffline': string;
@@ -83,15 +90,44 @@ export interface Dict {
   'settings.codeAgentHint': string;
   'settings.rescan': string;
   'settings.rescanTitle': string;
+  'settings.rescanRunning': string;
+  'settings.rescanSuccess': string;
+  'settings.rescanFailed': string;
+  'settings.test': string;
+  'settings.testTitle': string;
+  'settings.testRunning': string;
+  'settings.testCancel': string;
+  'settings.testSuccessApi': string;
+  'settings.testSuccessCli': string;
+  'settings.testAuthFailed': string;
+  'settings.testForbidden': string;
+  'settings.testNotFoundModel': string;
+  'settings.testInvalidModelId': string;
+  'settings.testInvalidBaseUrl': string;
+  'settings.testRateLimited': string;
+  'settings.testUpstream': string;
+  'settings.testTimeout': string;
+  'settings.testAgentMissing': string;
+  'settings.testAgentSpawn': string;
+  'settings.testUnknown': string;
   'settings.noAgentsDetected': string;
   'settings.apiSection': string;
+  'settings.quickFillProvider': string;
+  'settings.customProvider': string;
   'settings.apiKey': string;
   'settings.showKey': string;
   'settings.hideKey': string;
   'settings.show': string;
   'settings.hide': string;
   'settings.model': string;
+  'settings.suggestedModelsHint': string;
+  'settings.maxTokens': string;
+  'settings.maxTokensHint': string;
   'settings.baseUrl': string;
+  'settings.baseUrlInvalid': string;
+  'settings.azureDeploymentModel': string;
+  'settings.azureDeploymentModelHint': string;
+  'settings.apiVersion': string;
   'settings.apiHint': string;
   'settings.skipForNow': string;
   'settings.getStarted': string;
@@ -101,9 +137,18 @@ export interface Dict {
   'settings.noAgentSelected': string;
   'settings.language': string;
   'settings.languageHint': string;
+  'settings.appearance': string;
+  'settings.appearanceHint': string;
+  'settings.themeSystem': string;
+  'settings.themeLight': string;
+  'settings.themeDark': string;
   'settings.modelPicker': string;
   'settings.reasoningPicker': string;
   'settings.modelPickerHint': string;
+  'settings.cliEnvTitle': string;
+  'settings.cliEnvHint': string;
+  'settings.cliEnvClaudeConfigDir': string;
+  'settings.cliEnvCodexHome': string;
   'settings.modelCustom': string;
   'settings.modelCustomLabel': string;
   'settings.modelCustomPlaceholder': string;
@@ -126,11 +171,51 @@ export interface Dict {
   'settings.runtimePackaged': string;
   'settings.runtimeDevelopment': string;
   'settings.versionUnavailable': string;
+  'settings.library': string;
+  'settings.libraryHint': string;
+  'settings.librarySkills': string;
+  'settings.libraryDesignSystems': string;
+  'settings.librarySearch': string;
+  'settings.libraryAll': string;
+  'settings.libraryPreview': string;
+  'settings.libraryPreviewClose': string;
+  'settings.libraryLoading': string;
+  'settings.libraryNoResults': string;
+  'settings.libraryEnabled': string;
+  'settings.libraryDisabled': string;
+  'settings.libraryToggleLabel': string;
+
+  // Notifications (settings + system notifications)
+  'settings.notifications': string;
+  'settings.notificationsHint': string;
+  'settings.notifyCompletionSound': string;
+  'settings.notifyCompletionSoundHint': string;
+  'settings.notifySuccessSound': string;
+  'settings.notifyFailureSound': string;
+  'settings.notifyDesktop': string;
+  'settings.notifyDesktopHint': string;
+  'settings.notifyDesktopBlocked': string;
+  'settings.notifyDesktopUnsupported': string;
+  'settings.notifyTest': string;
+  'settings.notifyTestSent': string;
+  'settings.notifyTestFailed': string;
+  'settings.notifySoundDing': string;
+  'settings.notifySoundChime': string;
+  'settings.notifySoundTwoToneUp': string;
+  'settings.notifySoundPluck': string;
+  'settings.notifySoundBuzz': string;
+  'settings.notifySoundTwoToneDown': string;
+  'settings.notifySoundThud': string;
+  'notify.successTitle': string;
+  'notify.failureTitle': string;
+  'notify.successBody': string;
+  'notify.failureBody': string;
 
   // Entry view / tabs
   'entry.tabDesigns': string;
   'entry.tabExamples': string;
   'entry.tabDesignSystems': string;
+  'entry.tabConnectors': string;
   'entry.tabImageTemplates': string;
   'entry.tabVideoTemplates': string;
   'entry.openSettingsTitle': string;
@@ -138,12 +223,51 @@ export interface Dict {
   'entry.resizeAria': string;
   'entry.loadingWorkspace': string;
 
+  // Connectors tab
+  'connectors.title': string;
+  'connectors.subtitle': string;
+  'connectors.account': string;
+  'connectors.noAccount': string;
+  'connectors.tools': string;
+  'connectors.connect': string;
+  'connectors.disconnect': string;
+  'connectors.configure': string;
+  'connectors.unavailable': string;
+  'connectors.phaseStubTitle': string;
+  'connectors.statusAvailable': string;
+  'connectors.statusConnected': string;
+  'connectors.statusError': string;
+  'connectors.statusDisabled': string;
+  'connectors.gateTitle': string;
+  'connectors.gateBody': string;
+  'connectors.gateAction': string;
+  'connectors.aboutLabel': string;
+  'connectors.detailsLabel': string;
+  'connectors.statusLabel': string;
+  'connectors.categoryLabel': string;
+  'connectors.providerLabel': string;
+  'connectors.toolsSection': string;
+  'connectors.toolsLoading': string;
+  'connectors.noToolsAvailable': string;
+  'connectors.openDetailsAria': string;
+  'connectors.toolsBadgeNone': string;
+  'connectors.toolsBadgeOne': string;
+  'connectors.toolsBadgeMany': string;
+  'connectors.searchPlaceholder': string;
+  'connectors.searchAriaLabel': string;
+  'connectors.searchClear': string;
+  'connectors.emptyNoMatchTitle': string;
+  'connectors.emptyNoMatchBody': string;
+  'connectors.emptyNoMatchAction': string;
+
   // New project panel
   'newproj.tabPrototype': string;
+  'newproj.tabLiveArtifact': string;
   'newproj.tabDeck': string;
   'newproj.tabTemplate': string;
   'newproj.tabOther': string;
   'newproj.titlePrototype': string;
+  'newproj.titleLiveArtifact': string;
   'newproj.titleDeck': string;
   'newproj.titleTemplate': string;
   'newproj.titleImage': string;
@@ -165,6 +289,7 @@ export interface Dict {
   'newproj.fileSingular': string;
   'newproj.filePlural': string;
   'newproj.create': string;
+  'newproj.createLiveArtifact': string;
   'newproj.createFromTemplate': string;
   'newproj.createDisabledTitle': string;
   'newproj.importClaudeZip': string;
@@ -205,6 +330,15 @@ export interface Dict {
   'newproj.audioDurationSeconds': string;
   'newproj.voiceLabel': string;
   'newproj.voicePlaceholder': string;
+  'newproj.connectorsLabel': string;
+  'newproj.connectorsHint': string;
+  'newproj.connectorsEmptyTitle': string;
+  'newproj.connectorsEmptyBody': string;
+  'newproj.connectorsEmptyCta': string;
+  'newproj.connectorsLoading': string;
+  'newproj.connectorsCountOne': string;
+  'newproj.connectorsCountMany': string;
+  'newproj.connectorsManage': string;
   'newproj.promptTemplateLabel': string;
   'newproj.promptTemplateNoneTitle': string;
   'newproj.promptTemplateNoneSub': string;
@@ -232,6 +366,8 @@ export interface Dict {
   'promptTemplates.openSource': string;
   'promptTemplates.openFullscreen': string;
   'promptTemplates.closeFullscreen': string;
+  'promptTemplates.allSources': string;
+  'promptTemplates.sourceFilterAria': string;
   'promptTemplates.retry': string;
 
   // Designs tab
@@ -244,6 +380,15 @@ export interface Dict {
   'designs.deleteTitle': string;
   'designs.deleteConfirm': string;
   'designs.cardFreeform': string;
+  'designs.badgeLive': string;
+  'designs.liveArtifactBadgesAria': string;
+  'designs.liveCount': string;
+  'designs.statusLive': string;
+  'designs.statusArchived': string;
+  'designs.statusError': string;
+  'designs.statusRefreshing': string;
+  'designs.statusRefreshFailed': string;
+  'designs.statusRefreshed': string;
   'designs.status.notStarted': string;
   'designs.status.queued': string;
   'designs.status.running': string;
@@ -270,6 +415,7 @@ export interface Dict {
   'examples.modePrototypeMobile': string;
   'examples.modeDeck': string;
   'examples.modeDocument': string;
+  'examples.modeOrbit': string;
   'examples.scenarioGeneral': string;
   'examples.scenarioEngineering': string;
   'examples.scenarioProduct': string;
@@ -283,6 +429,8 @@ export interface Dict {
   'examples.scenarioLegal': string;
   'examples.scenarioEducation': string;
   'examples.scenarioPersonal': string;
+  'examples.searchPlaceholder': string;
+  'examples.searchAria': string;
   'examples.emptyNoSkills': string;
   'examples.emptyNoMatch': string;
   'examples.openPreview': string;
@@ -320,6 +468,8 @@ export interface Dict {
   'ds.categoryUncategorized': string;
   'ds.showcase': string;
   'ds.tokens': string;
+  'ds.specToggle': string;
+  'ds.specLoading': string;
 
   // Avatar menu (project topbar)
   'avatar.title': string;
@@ -343,9 +493,22 @@ export interface Dict {
   // Project view / chat pane / composer
   'project.backToProjects': string;
   'project.metaFreeform': string;
+  'project.resizeChatPanel': string;
   'chat.tabChat': string;
   'chat.tabComments': string;
   'chat.commentsSoon': string;
+  'chat.comments.attached': string;
+  'chat.comments.emptyAttached': string;
+  'chat.comments.saved': string;
+  'chat.comments.emptySaved': string;
+  'chat.comments.add': string;
+  'chat.comments.addAll': string;
+  'chat.comments.remove': string;
+  'chat.comments.placeholder': string;
+  'chat.comments.addSend': string;
+  'chat.comments.updateSend': string;
+  'chat.comments.removeAttachment': string;
+  'chat.comments.removeAttachmentAria': string;
   'chat.conversationsTitle': string;
   'chat.conversationsAria': string;
   'chat.newConversation': string;
@@ -379,6 +542,10 @@ export interface Dict {
   'chat.importFolder': string;
   'chat.importSkills': string;
   'chat.importProject': string;
+  'chat.linkedFolderRemoveAria': string;
+  'chat.linkedFolderNotFound': string;
+  'chat.linkedFolderAlready': string;
+  'chat.linkedFolderPickError': string;
   'chat.send': string;
   'chat.stop': string;
   'chat.removeAria': string;
@@ -399,6 +566,8 @@ export interface Dict {
   'preview.fullscreen': string;
   'preview.closeTitle': string;
   'preview.loading': string;
+  'preview.showSidebar': string;
+  'preview.hideSidebar': string;
 
   // Misc fallback names
   'misc.savedTemplate': string;
@@ -407,6 +576,8 @@ export interface Dict {
 
   // Workspace / file viewer / design files panel
   'workspace.designFiles': string;
+  'workspace.focusMode': string;
+  'workspace.showChat': string;
   'workspace.closeTab': string;
   'workspace.deleteFileConfirm': string;
   'workspace.openFromDesignFiles': string;
@@ -426,6 +597,9 @@ export interface Dict {
   'designFiles.rowMenu': string;
   'designFiles.openInTab': string;
   'designFiles.download': string;
+  'designFiles.downloadSelected': string;
+  'designFiles.clearSelection': string;
+  'designFiles.selectAll': string;
   'designFiles.dropTitle': string;
   'designFiles.dropDesc': string;
   'designFiles.upload.title': string;
@@ -440,7 +614,9 @@ export interface Dict {
   'designFiles.sectionScripts': string;
   'designFiles.sectionImages': string;
   'designFiles.sectionSketches': string;
+  'designFiles.sectionLiveArtifacts': string;
   'designFiles.sectionOther': string;
+  'designFiles.showMore': string;
   'designFiles.kindHtml': string;
   'designFiles.kindImage': string;
   'designFiles.kindSketch': string;
@@ -450,7 +626,14 @@ export interface Dict {
   'designFiles.kindDocument': string;
   'designFiles.kindPresentation': string;
   'designFiles.kindSpreadsheet': string;
+  'designFiles.kindLiveArtifact': string;
   'designFiles.kindBinary': string;
+  'quickSwitcher.placeholder': string;
+  'quickSwitcher.empty': string;
+  'quickSwitcher.noMatches': string;
+  'quickSwitcher.navigate': string;
+  'quickSwitcher.open': string;
+  'quickSwitcher.close': string;
   'pasteDialog.title': string;
   'pasteDialog.hint': string;
   'pasteDialog.fileNameLabel': string;
@@ -501,6 +684,47 @@ export interface Dict {
   'fileViewer.comment': string;
   'fileViewer.edit': string;
   'fileViewer.draw': string;
+  'manualEdit.layers': string;
+  'manualEdit.editableCount': string;
+  'manualEdit.title': string;
+  'manualEdit.selectLayer': string;
+  'manualEdit.empty': string;
+  'manualEdit.noClass': string;
+  'manualEdit.tabsAria': string;
+  'manualEdit.tabContent': string;
+  'manualEdit.tabStyle': string;
+  'manualEdit.tabAttributes': string;
+  'manualEdit.tabHtml': string;
+  'manualEdit.tabSource': string;
+  'manualEdit.attributesJson': string;
+  'manualEdit.selectedHtml': string;
+  'manualEdit.fullSource': string;
+  'manualEdit.applyContent': string;
+  'manualEdit.applyStyle': string;
+  'manualEdit.applyAttributes': string;
+  'manualEdit.applyHtml': string;
+  'manualEdit.applySource': string;
+  'manualEdit.invalidAttributes': string;
+  'manualEdit.changes': string;
+  'manualEdit.undo': string;
+  'manualEdit.redo': string;
+  'manualEdit.noChanges': string;
+  'manualEdit.imageUrl': string;
+  'manualEdit.altText': string;
+  'manualEdit.label': string;
+  'manualEdit.text': string;
+  'manualEdit.href': string;
+  'manualEdit.textColor': string;
+  'manualEdit.background': string;
+  'manualEdit.fontSize': string;
+  'manualEdit.weight': string;
+  'manualEdit.align': string;
+  'manualEdit.padding': string;
+  'manualEdit.margin': string;
+  'manualEdit.radius': string;
+  'manualEdit.border': string;
+  'manualEdit.width': string;
+  'manualEdit.minHeight': string;
   'fileViewer.zoomOut': string;
   'fileViewer.zoomIn': string;
   'fileViewer.resetZoom': string;
@@ -521,6 +745,7 @@ export interface Dict {
   'fileViewer.exportPptxNa': string;
   'fileViewer.exportZip': string;
   'fileViewer.exportHtml': string;
+  'fileViewer.exportMd': string;
   'fileViewer.exportJsx': string;
   'fileViewer.exportReactHtml': string;
   'fileViewer.saveAsTemplate': string;
@@ -530,6 +755,24 @@ export interface Dict {
   'fileViewer.templateNamePrompt': string;
   'fileViewer.templateNameDefault': string;
   'fileViewer.templateDescPrompt': string;
+  'liveArtifact.refresh.button': string;
+  'liveArtifact.refresh.buttonTitle': string;
+  'liveArtifact.refresh.loadingTitle': string;
+  'liveArtifact.refresh.noSourceTitle': string;
+  'liveArtifact.refresh.running': string;
+  'liveArtifact.refresh.runningMessage': string;
+  'liveArtifact.refresh.runningAction': string;
+  'liveArtifact.refresh.successOne': string;
+  'liveArtifact.refresh.successMany': string;
+  'liveArtifact.refresh.successAction': string;
+  'liveArtifact.refresh.previousFailure': string;
+  'liveArtifact.refresh.failureAction': string;
+  'liveArtifact.refresh.networkFailure': string;
+  'liveArtifact.refresh.genericFailure': string;
+  'liveArtifact.refresh.statusNever': string;
+  'liveArtifact.refresh.statusReady': string;
+  'liveArtifact.refresh.statusSucceeded': string;
+  'liveArtifact.refresh.statusFailed': string;
   'fileViewer.deployToVercel': string;
   'fileViewer.redeployToVercel': string;
   'fileViewer.deployingToVercel': string;
@@ -648,6 +891,125 @@ export interface Dict {
   'qf.cardSelected': string;
   'qf.cardRefs': string;
   'qf.cardSampleText': string;
+
+  // Pet (Codex-style floating companion)
+  'pet.title': string;
+  'pet.subtitle': string;
+  'pet.navTitle': string;
+  'pet.navHint': string;
+  // Tabs in pet settings — split sources so the choice feels exclusive
+  'pet.tabBuiltIn': string;
+  'pet.tabBuiltInHint': string;
+  'pet.builtInEmpty': string;
+  'pet.tabCustom': string;
+  'pet.tabCustomHint': string;
+  'pet.tabCommunity': string;
+  'pet.tabCommunityHint': string;
+  'pet.tabsAria': string;
+  'pet.adopt': string;
+  'pet.adoptedBadge': string;
+  'pet.adoptCallout': string;
+  'pet.changePet': string;
+  'pet.wake': string;
+  'pet.tuck': string;
+  'pet.wakeTitle': string;
+  'pet.tuckTitle': string;
+  'pet.settingsTitle': string;
+  'pet.useCustom': string;
+  'pet.customTitle': string;
+  'pet.customHint': string;
+  'pet.customGreetingPlaceholder': string;
+  'pet.fieldName': string;
+  'pet.fieldGlyph': string;
+  'pet.fieldGlyphHint': string;
+  'pet.fieldGreeting': string;
+  'pet.fieldAccent': string;
+  'pet.fieldAccentCustom': string;
+  'pet.overlayAria': string;
+  'pet.spriteAria': string;
+  'pet.spriteTitle': string;
+  // Right-side rail (entry view)
+  'pet.railAria': string;
+  'pet.railTitle': string;
+  'pet.railHint': string;
+  'pet.railExpand': string;
+  'pet.railCollapse': string;
+  'pet.railHide': string;
+  'pet.railShow': string;
+  'pet.railCustomFlavor': string;
+  'pet.railCustomize': string;
+  // Composer pet menu
+  'pet.composerTitle': string;
+  'pet.composerMenuTitle': string;
+  'pet.composerMenuHint': string;
+  'pet.composerOpenSettings': string;
+  // Welcome modal teaser
+  'pet.welcomeTeaserTitle': string;
+  'pet.welcomeTeaserBody': string;
+  'pet.welcomeTeaserCta': string;
+  // Image upload + spritesheet controls
+  'pet.imageUpload': string;
+  'pet.imageReplace': string;
+  'pet.imageRemove': string;
+  'pet.imageHintIdle': string;
+  'pet.imageHintActive': string;
+  'pet.fieldFrames': string;
+  'pet.fieldFramesHint': string;
+  'pet.fieldFps': string;
+  'pet.fieldFpsHint': string;
+
+  // Codex hatch-pet skill — atlas import + AI generation
+  'pet.atlasImport': string;
+  'pet.atlasImportTitle': string;
+  'pet.atlasPickerTitle': string;
+  'pet.atlasPickerHint': string;
+  'pet.atlasCancel': string;
+  'pet.atlasAdopt': string;
+  'pet.atlasAdoptFull': string;
+  'pet.atlasAdoptFullTitle': string;
+  'pet.atlasAdoptRowTitle': string;
+  'pet.atlasActiveHint': string;
+  'pet.atlasRow.idle': string;
+  'pet.atlasRow.running-right': string;
+  'pet.atlasRow.running-left': string;
+  'pet.atlasRow.waving': string;
+  'pet.atlasRow.jumping': string;
+  'pet.atlasRow.failed': string;
+  'pet.atlasRow.waiting': string;
+  'pet.atlasRow.running': string;
+  'pet.atlasRow.review': string;
+  'pet.hatchTitle': string;
+  'pet.hatchHint': string;
+  'pet.hatchConcept': string;
+  'pet.hatchConceptPlaceholder': string;
+  'pet.hatchCopy': string;
+  'pet.hatchCopied': string;
+  'pet.hatchFoot': string;
+  // Slash-command popover in the chat composer
+  'pet.slashPopoverAria': string;
+  'pet.slashPopoverTitle': string;
+  'pet.slashPopoverHint': string;
+  'pet.slashPet': string;
+  'pet.slashPetWake': string;
+  'pet.slashPetTuck': string;
+  'pet.slashHatch': string;
+  'pet.slashHatchArg': string;
+  // Recently-hatched section in pet settings
+  'pet.codexTitle': string;
+  'pet.codexSubtitle': string;
+  'pet.codexSubtitleWithDir': string;
+  'pet.codexEmpty': string;
+  'pet.codexLoading': string;
+  'pet.codexRefresh': string;
+  'pet.codexAdopt': string;
+  'pet.codexAdopting': string;
+  'pet.communitySync': string;
+  'pet.communitySyncing': string;
+  'pet.communitySyncTitle': string;
+  'pet.communitySyncDone': string;
+  'pet.communitySyncFailed': string;
+  'pet.codexBundled': string;
+  'pet.codexBundledTitle': string;
 
   // Sketch editor
   'sketch.toolSelect': string;

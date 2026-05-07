@@ -1,7 +1,6 @@
 import { spawn, type ChildProcess } from "node:child_process";
 import { mkdir, open, type FileHandle } from "node:fs/promises";
 import { createRequire } from "node:module";
-import { homedir } from "node:os";
 import { delimiter, dirname, join } from "node:path";
 import { setTimeout as sleep } from "node:timers/promises";
 
@@ -22,12 +21,27 @@ import {
   resolveAppIpcPath,
   type SidecarRuntimeContext,
 } from "@open-design/sidecar";
-import { createProcessStampArgs, stopProcesses, waitForProcessExit } from "@open-design/platform";
+import {
+  createProcessStampArgs,
+  stopProcesses,
+  waitForProcessExit,
+  wellKnownUserToolchainBins,
+} from "@open-design/platform";
 
+import type { PackagedWebOutputMode } from "./config.js";
 import type { PackagedNamespacePaths } from "./paths.js";
 
 const require = createRequire(import.meta.url);
 const PACKAGED_CHILD_ENV_ALLOWLIST = ["HOME", "LANG", "LC_ALL", "LOGNAME", "TMPDIR", "USER"] as const;
+
+function shouldForwardPackagedChildEnv(key: string, includeProviderSecrets = false): boolean {
+  return (
+    PACKAGED_CHILD_ENV_ALLOWLIST.includes(
+      key as (typeof PACKAGED_CHILD_ENV_ALLOWLIST)[number],
+    ) ||
+    (includeProviderSecrets && (key.endsWith("_API_KEY") || key.endsWith("_TOKEN")))
+  );
+}
 
 export type PackagedSidecarHandle = {
   close(): Promise<void>;
@@ -94,29 +108,29 @@ function extractPort(url: string): string {
   return parsed.port || (parsed.protocol === "https:" ? "443" : "80");
 }
 
+// Hardcoded POSIX system bins the packaged daemon must always be able to
+// reach even when the inherited PATH from launchd / a desktop launcher is
+// stripped down to nothing. The user-toolchain portion of the search list
+// (Homebrew, npm globals, nvm/fnm/mise, cargo, ...) lives in
+// @open-design/platform's wellKnownUserToolchainBins so the daemon
+// resolver and this PATH builder cannot drift again. See issue #442.
+const PACKAGED_POSIX_SYSTEM_BINS = ["/usr/bin", "/bin", "/usr/sbin", "/sbin"] as const;
+
 function resolvePackagedPathEnv(basePath = process.env.PATH ?? ""): string {
-  const home = homedir();
   const candidates = [
     ...basePath.split(delimiter),
-    join(home, ".local", "bin"),
-    join(home, ".opencode", "bin"),
-    join(home, ".cargo", "bin"),
-    join(home, ".bun", "bin"),
-    "/opt/homebrew/bin",
-    "/usr/local/bin",
-    "/usr/bin",
-    "/bin",
-    "/usr/sbin",
-    "/sbin",
+    ...wellKnownUserToolchainBins(),
+    ...PACKAGED_POSIX_SYSTEM_BINS,
   ];
   return [...new Set(candidates.filter((entry) => entry.length > 0))].join(delimiter);
 }
 
-function resolvePackagedChildBaseEnv(env: NodeJS.ProcessEnv = process.env): NodeJS.ProcessEnv {
+function resolvePackagedChildBaseEnv(env: NodeJS.ProcessEnv = process.env,includeProviderSecrets = false,): NodeJS.ProcessEnv {
   const baseEnv: NodeJS.ProcessEnv = {};
-  for (const key of PACKAGED_CHILD_ENV_ALLOWLIST) {
-    const value = env[key];
-    if (value != null && value.length > 0) baseEnv[key] = value;
+  for (const [key, value] of Object.entries(env)) {
+    if (value != null && value.length > 0 && shouldForwardPackagedChildEnv(key, includeProviderSecrets)) {
+      baseEnv[key] = value;
+    }
   }
   return baseEnv;
 }
@@ -155,7 +169,7 @@ async function spawnSidecarChild(options: {
     base: options.paths.runtimeRoot,
     contract: OPEN_DESIGN_SIDECAR_CONTRACT,
     extraEnv: {
-      ...resolvePackagedChildBaseEnv(),
+      ...resolvePackagedChildBaseEnv(process.env, options.app === APP_KEYS.DAEMON),
       ...options.env,
       NODE_ENV: "production",
       PATH: resolvePackagedPathEnv(),
@@ -200,7 +214,12 @@ async function closeManagedChild(child: ManagedSidecarChild): Promise<void> {
 export async function startPackagedSidecars(
   runtime: SidecarRuntimeContext<SidecarStamp>,
   paths: PackagedNamespacePaths,
-  options: { nodeCommand: string | null },
+  options: {
+    appVersion: string | null;
+    nodeCommand: string | null;
+    webStandaloneRoot: string | null;
+    webOutputMode: PackagedWebOutputMode;
+  },
 ): Promise<PackagedSidecarHandle> {
   await mkdir(paths.namespaceRoot, { recursive: true });
   await mkdir(paths.cacheRoot, { recursive: true });
@@ -224,6 +243,7 @@ export async function startPackagedSidecars(
         // fallback, but packaged runtime must not rely on path inference from
         // Electron userData, bundle names, or ports.
         ...createPackagedDaemonManagedPathEnv(paths),
+        ...(options.appVersion == null ? {} : { OD_APP_VERSION: options.appVersion }),
       },
       nodeCommand: options.nodeCommand,
       paths,
@@ -242,7 +262,8 @@ export async function startPackagedSidecars(
       env: {
         [SIDECAR_ENV.DAEMON_PORT]: extractPort(daemonStatus.url),
         [SIDECAR_ENV.WEB_PORT]: "0",
-        OD_WEB_OUTPUT_MODE: "server",
+        ...(options.webStandaloneRoot == null ? {} : { OD_WEB_STANDALONE_ROOT: options.webStandaloneRoot }),
+        OD_WEB_OUTPUT_MODE: options.webOutputMode,
         PORT: "0",
       },
       nodeCommand: options.nodeCommand,

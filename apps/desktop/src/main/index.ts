@@ -101,6 +101,10 @@ export async function runDesktopMain(
     app.quit();
   }
 
+  function shutdownAndExit(): void {
+    void shutdown().finally(() => process.exit(0));
+  }
+
   attachParentMonitor(shutdown);
 
   ipcServer = await createJsonIpcServer({
@@ -120,20 +124,30 @@ export async function runDesktopMain(
           return await desktop.click(request.input as DesktopClickInput);
         case SIDECAR_MESSAGES.SHUTDOWN:
           setImmediate(() => {
-            void shutdown().finally(() => process.exit(0));
+            shutdownAndExit();
           });
           return { accepted: true };
       }
     },
   });
 
+  app.on("before-quit", (event) => {
+    if (shuttingDown) return;
+    event.preventDefault();
+    shutdownAndExit();
+  });
+
   app.on("window-all-closed", () => {
-    void shutdown().finally(() => process.exit(0));
+    shutdownAndExit();
+  });
+
+  app.on("activate", () => {
+    desktop.show();
   });
 
   for (const signal of ["SIGINT", "SIGTERM"] as const) {
     process.on(signal, () => {
-      void shutdown().finally(() => process.exit(0));
+      shutdownAndExit();
     });
   }
 }

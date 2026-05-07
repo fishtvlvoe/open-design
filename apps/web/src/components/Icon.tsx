@@ -4,6 +4,7 @@ type IconName =
   | 'arrow-left'
   | 'arrow-up'
   | 'attach'
+  | 'bell'
   | 'check'
   | 'chevron-down'
   | 'chevron-left'
@@ -14,6 +15,7 @@ type IconName =
   | 'download'
   | 'draw'
   | 'edit'
+  | 'external-link'
   | 'eye'
   | 'file'
   | 'file-code'
@@ -41,6 +43,7 @@ type IconName =
   | 'spinner'
   | 'sparkles'
   | 'stop'
+  | 'sun-moon'
   | 'tweaks'
   | 'upload'
   | 'zoom-in'
@@ -90,6 +93,13 @@ export function Icon({ name, size = 14, strokeWidth = 1.6, ...rest }: Props) {
       return (
         <svg {...common}>
           <path d="m21.44 11.05-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48" />
+        </svg>
+      );
+    case 'bell':
+      return (
+        <svg {...common}>
+          <path d="M6 8a6 6 0 1 1 12 0c0 7 3 9 3 9H3s3-2 3-9" />
+          <path d="M10.3 21a1.94 1.94 0 0 0 3.4 0" />
         </svg>
       );
     case 'check':
@@ -163,6 +173,14 @@ export function Icon({ name, size = 14, strokeWidth = 1.6, ...rest }: Props) {
         <svg {...common}>
           <path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7-10-7-10-7Z" />
           <circle cx="12" cy="12" r="3" />
+        </svg>
+      );
+    case 'external-link':
+      return (
+        <svg {...common}>
+          <path d="M15 3h6v6" />
+          <path d="M10 14 21 3" />
+          <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6" />
         </svg>
       );
     case 'file':
@@ -367,6 +385,20 @@ export function Icon({ name, size = 14, strokeWidth = 1.6, ...rest }: Props) {
       return (
         <svg {...common}>
           <rect x="6" y="6" width="12" height="12" rx="1.5" />
+        </svg>
+      );
+    case 'sun-moon':
+      return (
+        <svg {...common}>
+          <path d="M12 8a2.83 2.83 0 0 0 4 4 4 4 0 1 1-4-4" />
+          <path d="M12 2v2" />
+          <path d="M12 20v2" />
+          <path d="m4.9 4.9 1.4 1.4" />
+          <path d="m17.7 17.7 1.4 1.4" />
+          <path d="M2 12h2" />
+          <path d="M20 12h2" />
+          <path d="m6.3 17.7-1.4 1.4" />
+          <path d="m19.1 4.9-1.4 1.4" />
         </svg>
       );
     case 'tweaks':

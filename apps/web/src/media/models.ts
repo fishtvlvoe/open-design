@@ -30,7 +30,9 @@ import type { AudioKind, MediaAspect } from '../types';
 export type MediaProviderId =
   | 'openai'
   | 'volcengine'
+  | 'grok'
   | 'hyperframes'
+  | 'nanobanana'
   | 'bfl'
   | 'fal'
   | 'replicate'
@@ -60,6 +62,8 @@ export interface MediaProvider {
   defaultBaseUrl?: string;
   /** Documentation URL for getting an API key. */
   docsUrl?: string;
+  /** Whether Settings should expose a custom model override field. */
+  supportsCustomModel?: boolean;
 }
 
 /**
@@ -86,6 +90,14 @@ export const MEDIA_PROVIDERS: MediaProvider[] = [
     docsUrl: 'https://console.volcengine.com/ark',
   },
   {
+    id: 'grok',
+    label: 'xAI Grok Imagine',
+    hint: 'grok-imagine — image + video with native audio',
+    integrated: true,
+    defaultBaseUrl: 'https://api.x.ai/v1',
+    docsUrl: 'https://docs.x.ai/developers/model-capabilities/video/generation',
+  },
+  {
     id: 'hyperframes',
     label: 'HyperFrames',
     hint: 'Local HTML -> MP4 renderer',
@@ -93,6 +105,15 @@ export const MEDIA_PROVIDERS: MediaProvider[] = [
     credentialsRequired: false,
     settingsVisible: false,
     docsUrl: 'https://hyperframes.heygen.com',
+  },
+  {
+    id: 'nanobanana',
+    label: 'Nano Banana',
+    hint: 'Google official by default; custom gateway configurable',
+    integrated: true,
+    defaultBaseUrl: 'https://generativelanguage.googleapis.com',
+    docsUrl: 'https://ai.google.dev/gemini-api/docs/api-key',
+    supportsCustomModel: true,
   },
   {
     id: 'bfl',
@@ -265,6 +286,24 @@ export const IMAGE_MODELS: MediaModel[] = [
     caps: ['i2i'],
   },
 
+  // xAI Grok Imagine — text-to-image (1k/2k, 11+ aspect ratios).
+  {
+    id: 'grok-imagine-image',
+    label: 'grok-imagine-image',
+    hint: 'xAI · 2K text-to-image',
+    provider: 'grok',
+    caps: ['t2i'],
+  },
+
+  // Nano Banana — Google-compatible generateContent image path.
+  {
+    id: 'gemini-3.1-flash-image-preview',
+    label: 'nano-banana-2',
+    hint: 'Nano Banana · text-to-image',
+    provider: 'nanobanana',
+    caps: ['t2i'],
+  },
+
   // Black Forest Labs FLUX family.
   { id: 'flux-1.1-pro', label: 'flux-1.1-pro', hint: 'BFL · flagship', provider: 'bfl', caps: ['t2i', 'i2i'] },
   { id: 'flux-pro', label: 'flux-pro', hint: 'BFL', provider: 'bfl', caps: ['t2i'] },
@@ -327,6 +366,15 @@ export const VIDEO_MODELS: MediaModel[] = [
     hint: 'ByteDance · text-to-video',
     provider: 'volcengine',
     caps: ['t2v'],
+  },
+
+  // xAI Grok Imagine — 720p t2v + i2v with natively generated audio.
+  {
+    id: 'grok-imagine-video',
+    label: 'grok-imagine-video',
+    hint: 'xAI · 720p t2v + i2v + native audio',
+    provider: 'grok',
+    caps: ['t2v', 'i2v', 'audio'],
   },
 
   // Kuaishou Kling.
