@@ -178,3 +178,6 @@ export {
 } from './registry.ts';
 
 export type { FrameworkParser } from './registry.ts';
+
+// ─── UI Component Scanner ────────────────────────────────────────────────────
+export { scanUiComponents, fuzzyFindComponent } from './ui-component-scanner.ts';
