@@ -19,7 +19,6 @@
   },
   "include": [
     "*.ts",
-    "parsers/**/*.ts",
     "__tests__/**/*.ts"
   ],
   "exclude": ["node_modules"]

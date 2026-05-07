@@ -19,6 +19,10 @@ import { join } from 'node:path';
 import type { ScanResult, ApiEndpoint } from './types.ts';
 import { getRegistered } from './registry.ts';
 
+// ─── 自動載入 parsers（觸發 registerParser 副作用） ─────────────────────────
+// 新增 parser 時，在這裡加一行 import。
+import './parsers/express-parser.ts';
+
 // ─── 主函式 ──────────────────────────────────────────────────────────────────
 
 /**
