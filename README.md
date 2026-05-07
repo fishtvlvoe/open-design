@@ -211,6 +211,7 @@ The visually distinctive skills you'll most likely run first. Each ships a real 
 | [`meeting-notes`](skills/meeting-notes/) | operation | Meeting decision log |
 | [`kanban-board`](skills/kanban-board/) | operation | Board snapshot |
 | [`eng-runbook`](skills/eng-runbook/) | engineering | Incident runbook |
+| [`api-bridge`](skills/api-bridge/) | engineering | Bridge an existing backend to an Open Design UI: scan codebase → connection map → Spectra change → handoff to Claude Code for implementation. Supports Express / Next.js / WordPress / OpenAPI v3. Triggers: “跟我的 FlowGo 專案銜接”, “我有既有後端，幫我連 UI”. |
 | [`finance-report`](skills/finance-report/) | finance | Exec finance summary |
 | [`invoice`](skills/invoice/) | finance | Single-page invoice |
 | [`hr-onboarding`](skills/hr-onboarding/) | hr | Role onboarding plan |

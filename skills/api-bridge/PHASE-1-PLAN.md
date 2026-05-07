@@ -188,3 +188,25 @@ type ScanResult = {
 
 1. 接受 Phase 1 計畫 → 派工 Task 1.1（架構）
 2. 計畫要修改 → Fish 指出哪裡要改
+
+## Phase 1 實際結果（2026-05-07）
+
+### 完成狀態
+
+- Wave 1-7 + 9 + 10 + 11.1 + 11.2 已完成（11.3 因 FlowGo 工作樹有 WIP 暫停）
+- Phase 1 完成度：21/24 tasks（87.5%），剩 11.3（FlowGo apply）+ 12.4（archive）
+
+### Scanner 在 5 個真實專案的結果
+
+- FlowGo（Express + React）：29 APIs / 164 components，首掃 45s / 增量 0.65s
+- MOLTOS（Next.js）：25 APIs
+- BuyGo+1（WordPress）：99 endpoints
+- inkgo（OpenAPI）：183 endpoints
+- three-ai（Next.js Electron）：0 APIs（正確 — 無 HTTP API surface）
+
+### 效能與驗證
+
+- Wave 7 mtime 快取驗證：FlowGo 增量掃描 70x 加速
+- Wave 11 E2E：產出 wire-schedule-publish change，在 FlowGo 通過 `spectra validate` + `spectra analyze` 0 findings
+- Wave 11 修復了一個 spectra-exporter bug：`tasks.md.tpl` 缺 design 主題引用，導致 Consistency findings
+- 92 unit tests 全綠；typecheck 0 錯
