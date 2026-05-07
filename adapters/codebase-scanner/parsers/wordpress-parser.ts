@@ -28,6 +28,10 @@ import fg from 'fast-glob';
 import type { ApiEndpoint, HttpMethod } from '../types.ts';
 import type { FrameworkParser } from '../registry.ts';
 import { registerParser } from '../registry.ts';
+import { maybeCachedParse } from '../cache.ts';
+
+/** Wave 7：cache namespace */
+const CACHE_NAMESPACE = 'wordpress-php';
 
 // ─── 常數 ────────────────────────────────────────────────────────────────────
 
@@ -430,6 +434,61 @@ function extractMethodsFromOptions(optionsRaw: string): string | null {
 
 // ─── FrameworkParser 實作 ─────────────────────────────────────────────────────
 
+
+// ─── Wave 7：per-file 解析 helper（供 cache wrapper 呼叫） ─────────────────
+
+/**
+ * 解析單一 PHP 檔，回傳該檔內所有 register_rest_route 對應的 ApiEndpoint。
+ * Cache miss 時被呼叫；命中時直接重用上次的結果（mtime 一致代表內容沒變）。
+ */
+async function parseSinglePhpFile(
+  filePath: string,
+  rootDir: string,
+): Promise<ApiEndpoint[]> {
+  let source: string;
+  try {
+    source = await readFile(filePath, 'utf-8');
+  } catch {
+    return [];
+  }
+
+  if (!hasRegisterRestRouteCall(source)) return [];
+
+  const parsedRoutes = parsePhpSource(source);
+  const relFile = relative(rootDir, filePath);
+  const endpoints: ApiEndpoint[] = [];
+
+  for (const route of parsedRoutes) {
+    if (route.namespace === null || route.route === null) {
+      console.warn(
+        `wordpress-parser: 無法解析 namespace 或 route，跳過 ${relFile}:${route.line}`,
+      );
+      continue;
+    }
+
+    if (route.methods.length === 0) {
+      // 無法解析 methods，預設 GET
+      route.methods = ['GET'];
+    }
+
+    // 組合路徑：/${namespace}${route}
+    const nsClean = route.namespace.replace(/^\/+|\/+$/g, '');
+    const routeClean = route.route.replace(/^\/+/, '');
+    const fullPath = `/${nsClean}/${routeClean}`.replace(/\/+$/, '') || '/';
+
+    for (const method of route.methods) {
+      endpoints.push({
+        method,
+        path: fullPath,
+        source: { file: relFile, line: route.line },
+        framework: 'wordpress',
+      });
+    }
+  }
+
+  return endpoints;
+}
+
 const wordpressParser: FrameworkParser = {
   framework: 'wordpress',
 
@@ -499,49 +558,20 @@ const wordpressParser: FrameworkParser = {
 
     const allEndpoints: ApiEndpoint[] = [];
 
-    await Promise.all(
-      phpFiles.map(async (filePath) => {
-        let source: string;
-        try {
-          source = await readFile(filePath, 'utf-8');
-        } catch {
-          return;
-        }
-
-        if (!hasRegisterRestRouteCall(source)) return;
-
-        const parsedRoutes = parsePhpSource(source);
-        const relFile = relative(rootDir, filePath);
-
-        for (const route of parsedRoutes) {
-          if (route.namespace === null || route.route === null) {
-            console.warn(
-              `wordpress-parser: 無法解析 namespace 或 route，跳過 ${relFile}:${route.line}`,
-            );
-            continue;
-          }
-
-          if (route.methods.length === 0) {
-            // 無法解析 methods，預設 GET
-            route.methods = ['GET'];
-          }
-
-          // 組合路徑：/${namespace}${route}
-          const nsClean = route.namespace.replace(/^\/+|\/+$/g, '');
-          const routeClean = route.route.replace(/^\/+/, '');
-          const fullPath = `/${nsClean}/${routeClean}`.replace(/\/+$/, '') || '/';
-
-          for (const method of route.methods) {
-            allEndpoints.push({
-              method,
-              path: fullPath,
-              source: { file: relFile, line: route.line },
-              framework: 'wordpress',
-            });
-          }
-        }
-      }),
+    // Wave 7：每檔結果走 mtime cache（payload 為該檔解析出的 ApiEndpoint[]）
+    const perFileResults = await Promise.all(
+      phpFiles.map((filePath) =>
+        maybeCachedParse<ApiEndpoint[]>(
+          filePath,
+          CACHE_NAMESPACE,
+          () => parseSinglePhpFile(filePath, rootDir),
+        ),
+      ),
     );
+
+    for (const eps of perFileResults) {
+      allEndpoints.push(...eps);
+    }
 
     // 依 method + path 去重
     const seen = new Set<string>();

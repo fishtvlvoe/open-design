@@ -22,6 +22,10 @@ import yaml from 'js-yaml';
 import type { ApiEndpoint, HttpMethod } from '../types.ts';
 import type { FrameworkParser } from '../registry.ts';
 import { registerParser } from '../registry.ts';
+import { maybeCachedParse } from '../cache.ts';
+
+/** Wave 7：cache namespace */
+const CACHE_NAMESPACE = 'openapi-doc';
 
 // ─── 常數 ────────────────────────────────────────────────────────────────────
 
@@ -236,6 +240,32 @@ function isSwaggerV2Doc(doc: unknown): boolean {
 
 // ─── FrameworkParser 實作 ─────────────────────────────────────────────────────
 
+
+// ─── Wave 7：per-file 解析 helper（供 cache wrapper 呼叫） ─────────────────
+
+/**
+ * 解析單一 OpenAPI 檔，回傳 ApiEndpoint[]。
+ * 非 OpenAPI 3.x 文件回傳空陣列；Swagger 2.0 印 warn 並回空陣列。
+ */
+async function parseSingleOpenApiFile(
+  filePath: string,
+  rootDir: string,
+): Promise<ApiEndpoint[]> {
+  const doc = await loadYamlOrJson(filePath);
+  const relFile = relative(rootDir, filePath);
+
+  if (isSwaggerV2Doc(doc)) {
+    console.warn(
+      `openapi-parser: skipped ${relFile} (Swagger 2.0 not supported, use OpenAPI 3.x)`,
+    );
+    return [];
+  }
+
+  if (!isOpenApiV3Doc(doc)) return [];
+
+  return extractEndpoints(doc, relFile);
+}
+
 const openapiParser: FrameworkParser = {
   framework: 'openapi',
 
@@ -285,28 +315,20 @@ const openapiParser: FrameworkParser = {
       return [];
     }
 
+    // Wave 7：每檔解析結果走 mtime cache
+    const perFileResults = await Promise.all(
+      candidates.map((filePath) =>
+        maybeCachedParse<ApiEndpoint[]>(
+          filePath,
+          CACHE_NAMESPACE,
+          () => parseSingleOpenApiFile(filePath, rootDir),
+        ),
+      ),
+    );
+
     const allEndpoints: ApiEndpoint[] = [];
-
-    for (const filePath of candidates) {
-      const doc = await loadYamlOrJson(filePath);
-
-      // Swagger 2.0 → warn 並跳過
-      if (isSwaggerV2Doc(doc)) {
-        const relFile = relative(rootDir, filePath);
-        console.warn(
-          `openapi-parser: skipped ${relFile} (Swagger 2.0 not supported, use OpenAPI 3.x)`,
-        );
-        continue;
-      }
-
-      // 不是 OpenAPI 3.x → 跳過（不 warn，可能是一般 YAML）
-      if (!isOpenApiV3Doc(doc)) {
-        continue;
-      }
-
-      const relFile = relative(rootDir, filePath);
-      const endpoints = extractEndpoints(doc, relFile);
-      allEndpoints.push(...endpoints);
+    for (const eps of perFileResults) {
+      allEndpoints.push(...eps);
     }
 
     return allEndpoints;

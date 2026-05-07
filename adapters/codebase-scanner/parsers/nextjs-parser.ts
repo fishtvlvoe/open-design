@@ -12,6 +12,9 @@
  *
  * 動態路由段 [id] 和 [...slug] 保留原樣。
  * 自動呼叫 registerParser 掛入 registry。
+ *
+ * Wave 7：per-file 結果（methods + firstExportLine）走 mtime cache，
+ * 同一檔未變動時跳過 readFile + babel parse + AST traverse。
  */
 
 import { readFile, stat } from 'node:fs/promises';
@@ -22,6 +25,7 @@ import fg from 'fast-glob';
 import type { ApiEndpoint, HttpMethod } from '../types.ts';
 import type { FrameworkParser } from '../registry.ts';
 import { registerParser } from '../registry.ts';
+import { maybeCachedParse } from '../cache.ts';
 
 // @babel/traverse 是 CJS 模組，使用 createRequire 確保正確載入
 const require = createRequire(import.meta.url);
@@ -44,6 +48,9 @@ const NEXTJS_HTTP_METHODS = new Set<HttpMethod>([
   'DELETE',
   'PATCH',
 ]);
+
+/** Wave 7：cache namespace（隔離不同 parser 的快取結果） */
+const CACHE_NAMESPACE = 'nextjs-route';
 
 // ─── 型別工具 ─────────────────────────────────────────────────────────────────
 
@@ -103,14 +110,24 @@ function filePathToApiPath(relFilePath: string): string {
 // ─── AST 解析 ─────────────────────────────────────────────────────────────────
 
 /**
- * 解析單一 route 檔的 AST，回傳偵測到的 HTTP methods。
+ * 單一 route 檔解析後的 cached payload：
+ * 含 HTTP methods 與「第一個 export 出現的行號」。
  */
-async function parseRouteFile(filePath: string): Promise<HttpMethod[]> {
+interface RouteFilePayload {
+  methods: HttpMethod[];
+  firstExportLine: number;
+}
+
+/**
+ * 解析單一 route 檔的 AST，回傳偵測到的 HTTP methods 與第一個 export 行號。
+ * 此函式是 cache miss 時實際跑的 parse 邏輯。
+ */
+async function parseRouteFileImpl(filePath: string): Promise<RouteFilePayload> {
   let source: string;
   try {
     source = await readFile(filePath, 'utf-8');
   } catch {
-    return [];
+    return { methods: [], firstExportLine: 1 };
   }
 
   let ast: ReturnType<typeof babelParse>;
@@ -121,10 +138,10 @@ async function parseRouteFile(filePath: string): Promise<HttpMethod[]> {
       errorRecovery: true,
     });
   } catch {
-    return [];
+    return { methods: [], firstExportLine: 1 };
   }
 
-  const methods = new Set<HttpMethod>();
+  const methodSet = new Set<HttpMethod>();
 
   traverse(ast, {
     // 模式 a：`export async function GET(...)` / `export function POST(...)`
@@ -147,7 +164,7 @@ async function parseRouteFile(filePath: string): Promise<HttpMethod[]> {
           // export function GET / export async function POST
           if (isIdentifier(decl.id)) {
             const m = toHttpMethod(decl.id.name);
-            if (m !== null) methods.add(m);
+            if (m !== null) methodSet.add(m);
           }
         } else if (decl.type === 'VariableDeclaration') {
           // export const GET = ...
@@ -155,7 +172,7 @@ async function parseRouteFile(filePath: string): Promise<HttpMethod[]> {
           for (const varDecl of declarations) {
             if (isIdentifier(varDecl.id)) {
               const m = toHttpMethod(varDecl.id.name);
-              if (m !== null) methods.add(m);
+              if (m !== null) methodSet.add(m);
             }
           }
         }
@@ -184,13 +201,29 @@ async function parseRouteFile(filePath: string): Promise<HttpMethod[]> {
 
         if (exportedName !== null) {
           const m = toHttpMethod(exportedName);
-          if (m !== null) methods.add(m);
+          if (m !== null) methodSet.add(m);
         }
       }
     },
   });
 
-  return [...methods];
+  // 找第一個 export 行號
+  const lines = source.split('\n');
+  const exportLineIdx = lines.findIndex((l) => l.trimStart().startsWith('export'));
+  const firstExportLine = exportLineIdx >= 0 ? exportLineIdx + 1 : 1;
+
+  return { methods: [...methodSet], firstExportLine };
+}
+
+/**
+ * Cache-aware wrapper：包 parseRouteFileImpl，命中時直接回 cached payload。
+ */
+async function parseRouteFile(filePath: string): Promise<RouteFilePayload> {
+  return maybeCachedParse<RouteFilePayload>(
+    filePath,
+    CACHE_NAMESPACE,
+    () => parseRouteFileImpl(filePath),
+  );
 }
 
 // ─── FrameworkParser 實作 ─────────────────────────────────────────────────────
@@ -258,20 +291,7 @@ const nextjsParser: FrameworkParser = {
       files.map(async (filePath) => {
         const relFile = relative(rootDir, filePath);
         const apiPath = filePathToApiPath(relFile);
-        const methods = await parseRouteFile(filePath);
-
-        // 取得第一行行號（代表整個 route 檔）
-        let source: string;
-        let firstExportLine = 1;
-        try {
-          source = await readFile(filePath, 'utf-8');
-          // 簡易找到第一個 export 的行號
-          const lines = source.split('\n');
-          const exportLineIdx = lines.findIndex((l) => l.trimStart().startsWith('export'));
-          if (exportLineIdx >= 0) firstExportLine = exportLineIdx + 1;
-        } catch {
-          // 忽略，使用預設行號 1
-        }
+        const { methods, firstExportLine } = await parseRouteFile(filePath);
 
         for (const method of methods) {
           allEndpoints.push({
@@ -297,9 +317,14 @@ registerParser(nextjsParser);
 export { nextjsParser };
 
 /**
- * 供測試用：解析單一 route 檔字串，回傳偵測到的 HTTP methods
+ * 供測試用：解析單一 route 檔字串，回傳偵測到的 HTTP methods（不走 cache）
+ *
+ * 注意：v1 介面回傳 HttpMethod[]，這裡保留同樣簽名（呼叫 impl 後取 methods 欄位）。
  */
-export { parseRouteFile as _parseRouteFileForTesting };
+export async function _parseRouteFileForTesting(filePath: string): Promise<HttpMethod[]> {
+  const { methods } = await parseRouteFileImpl(filePath);
+  return methods;
+}
 
 /**
  * 供測試用：檔案路徑轉 API path

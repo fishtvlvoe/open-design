@@ -27,6 +27,10 @@ import type {
   Node,
 } from '@babel/types';
 import type { UiComponent } from './types.ts';
+import { maybeCachedParse, ScannerCache, setActiveCache } from './cache.ts';
+
+/** Wave 7：cache namespace */
+const UI_CACHE_NAMESPACE = 'ui-component';
 
 // ─── 公開 API ─────────────────────────────────────────────────────────────────
 
@@ -54,12 +58,31 @@ export async function scanUiComponents(rootDir: string): Promise<UiComponent[]> 
     ],
   });
 
-  // 平行解析，逐檔掃描
-  const results = await Promise.all(
-    files.map((file) => parseFileForComponents(file)),
-  );
+  // Wave 7：若呼叫端未先 setActiveCache，這裡自己開一個 ad-hoc cache 管理生命週期
+  // （讓單獨呼叫 scanUiComponents 也享受 cache 加速）
+  const { getActiveCache } = await import('./cache.ts');
+  const externallyManaged = getActiveCache() !== null;
+  let ownedCache: ScannerCache | null = null;
+  if (!externallyManaged) {
+    ownedCache = await ScannerCache.load(absRoot);
+    setActiveCache(ownedCache);
+  }
 
-  return results.flat();
+  try {
+    // 平行解析，逐檔掃描（內部 parseFileForComponents 會走 cache）
+    const results = await Promise.all(
+      files.map((file) => parseFileForComponents(file)),
+    );
+    return results.flat();
+  } finally {
+    if (ownedCache !== null) {
+      try {
+        await ownedCache.save();
+      } finally {
+        setActiveCache(null);
+      }
+    }
+  }
 }
 
 /**
@@ -91,6 +114,16 @@ export function fuzzyFindComponent(
 
 /** 解析單一檔案並回傳找到的 UiComponent 列表。解析失敗時靜默回傳空陣列。 */
 async function parseFileForComponents(filePath: string): Promise<UiComponent[]> {
+  // Wave 7：走 mtime cache，命中時直接回 cached UiComponent[]
+  return maybeCachedParse<UiComponent[]>(
+    filePath,
+    UI_CACHE_NAMESPACE,
+    () => parseFileForComponentsImpl(filePath),
+  );
+}
+
+/** 實際解析邏輯（cache miss 時呼叫） */
+async function parseFileForComponentsImpl(filePath: string): Promise<UiComponent[]> {
   let source: string;
   try {
     source = await readFile(filePath, 'utf-8');

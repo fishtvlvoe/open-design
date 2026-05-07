@@ -4,20 +4,22 @@
  * 提供 scanProject() 公開函式，掃描指定根目錄並回傳 ScanResult。
  *
  * 流程：
- * 1. 讀取 package.json 偵測 techStack
- * 2. 從 registry 取得所有已註冊的 parser
- * 3. 平行呼叫每個 parser 的 detect()，篩出匹配的 parser
- * 4. 平行呼叫匹配 parser 的 parse()，合併 + 去重 API endpoints
- * 5. 組合 ScanResult 回傳
+ * 1. 載入 mtime cache（Wave 7：`<rootDir>/.open-design/scanner-cache.json`）
+ * 2. 讀取 package.json 偵測 techStack
+ * 3. 從 registry 取得所有已註冊的 parser
+ * 4. 平行呼叫每個 parser 的 detect()，篩出匹配的 parser
+ * 5. 平行呼叫匹配 parser 的 parse()（內部會走 cache）
+ * 6. 合併 + 去重 API endpoints
+ * 7. 儲存 cache 後組合 ScanResult 回傳
  *
- * 注意：Wave 1 的 registry 是空的，所有 parser 在 Wave 2 才注入。
- * 此版本 scanProject() 會正確執行完整流程，只是 apis / components 回傳空陣列。
+ * 注意：cache 採全域 active 模式（見 cache.ts），同一進程不支援並行掃描多 rootDir。
  */
 
 import { readFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import type { ScanResult, ApiEndpoint } from './types.ts';
 import { getRegistered } from './registry.ts';
+import { ScannerCache, setActiveCache } from './cache.ts';
 
 // ─── 自動載入 parsers（觸發 registerParser 副作用） ─────────────────────────
 // 新增 parser 時，在這裡加一行 import。
@@ -35,16 +37,31 @@ import './parsers/openapi-parser.ts';
  * @returns ScanResult，包含 techStack、apis、components、scannedAt
  */
 export async function scanProject(rootDir: string): Promise<ScanResult> {
-  const techStack = await detectTechStack(rootDir);
-  const apis = await gatherApis(rootDir);
+  // ─── Wave 7：載入 mtime cache ─────────────────────────────────────────────
+  // 載入失敗時 ScannerCache.load 會回傳空快取（不拋錯），不影響掃描流程。
+  const cache = await ScannerCache.load(rootDir);
+  setActiveCache(cache);
 
-  return {
-    techStack,
-    apis,
-    // components scanner 在 Wave 3 實作，先回傳空陣列
-    components: [],
-    scannedAt: new Date().toISOString(),
-  };
+  try {
+    const techStack = await detectTechStack(rootDir);
+    const apis = await gatherApis(rootDir);
+
+    return {
+      techStack,
+      apis,
+      // components scanner 在 Wave 3 實作；Wave 7 起也走 cache（內部呼叫 maybeCachedParse）
+      components: [],
+      scannedAt: new Date().toISOString(),
+    };
+  } finally {
+    // 不論成功失敗都嘗試寫回 cache（避免下一次掃描丟失部分 hit）
+    // 並清掉 activeCache 避免污染後續呼叫
+    try {
+      await cache.save();
+    } finally {
+      setActiveCache(null);
+    }
+  }
 }
 
 // ─── 內部輔助函式 ────────────────────────────────────────────────────────────
@@ -181,3 +198,7 @@ export type { FrameworkParser } from './registry.ts';
 
 // ─── UI Component Scanner ────────────────────────────────────────────────────
 export { scanUiComponents, fuzzyFindComponent } from './ui-component-scanner.ts';
+
+// ─── Wave 7：Cache 公開介面 ─────────────────────────────────────────────────
+export { ScannerCache, ScannerCacheSchema } from './cache.ts';
+export type { CacheEntry, ScannerCacheFile } from './cache.ts';
