@@ -23,6 +23,7 @@ import { getRegistered } from './registry.ts';
 // 新增 parser 時，在這裡加一行 import。
 import './parsers/express-parser.ts';
 import './parsers/nextjs-parser.ts';
+import './parsers/wordpress-parser.ts';
 
 // ─── 主函式 ──────────────────────────────────────────────────────────────────
 
