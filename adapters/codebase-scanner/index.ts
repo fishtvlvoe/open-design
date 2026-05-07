@@ -24,6 +24,7 @@ import { getRegistered } from './registry.ts';
 import './parsers/express-parser.ts';
 import './parsers/nextjs-parser.ts';
 import './parsers/wordpress-parser.ts';
+import './parsers/openapi-parser.ts';
 
 // ─── 主函式 ──────────────────────────────────────────────────────────────────
 
